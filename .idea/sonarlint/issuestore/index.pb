@@ -1,0 +1,23 @@
+
+@
+app/build.gradle,f\4\f4a01d6a4fcb971362ec00a83903fd3902f52164
+P
+ app/src/main/AndroidManifest.xml,8\c\8c55c3ccc257e5907959013f99656e4c8ec3903e
+t
+Dapp/src/main/java/com/gtriip/autowifi/wifi/WifiScanResultCallback.kt,9\6\968b00beb4aa2fb90dcc10d719a39c12692bfd1f
+q
+Aapp/src/main/java/com/gtriip/autowifi/wifi/WifiNetworkCallback.kt,0\d\0d6b0debd2d097cdbb97b232a1798d3bc4eb5cf0
+l
+<app/src/main/java/com/gtriip/autowifi/ui/ActivityCallback.kt,b\5\b5adfed09a4f7544499574aabd687929dd9fc684
+o
+?app/src/main/java/com/gtriip/autowifi/wifi/WifiStateCallback.kt,7\d\7d9a7bc1d08be2852c4e45c59f361f695b6ecbbb
+h
+8app/src/main/java/com/gtriip/autowifi/wifi/WifiHelper.kt,6\2\62766248693144c6d4801ff5ddb88653d1feaa1c
+i
+9app/src/main/java/com/gtriip/autowifi/domain/Extension.kt,b\c\bc85186ec22feb334f1518030618f72a9280e022
+u
+Eapp/src/main/java/com/gtriip/autowifi/location/HotelLocationHelper.kt,e\f\ef52b79db43004f1013fe8b9d89d557c1742c9d9
+m
+=app/src/main/java/com/gtriip/autowifi/wifi/HotelWifiHelper.kt,8\e\8ef1a3b9b9db186163207ff30c0898fcede4762f
+h
+8app/src/main/java/com/gtriip/autowifi/ui/MainActivity.kt,2\2\2280b363b8869077a85fd780cb63bd03d5b8a93d
