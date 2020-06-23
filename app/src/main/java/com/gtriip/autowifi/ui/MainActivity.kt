@@ -93,13 +93,13 @@ class MainActivity : AppCompatActivity(),
         preCheckConditions()
     }
 
-    override fun onPause() {
+    override fun onDestroy() {
         try {
             wifiHelper.unRegisterNetwork()
         } catch (e: Exception) {
             e.printStackTrace()
         }
-        super.onPause()
+        super.onDestroy()
     }
 
     private fun logText(text: String, error: Boolean) {
@@ -242,7 +242,7 @@ class MainActivity : AppCompatActivity(),
 
     override fun onWifiStateEnabled() {
         logText("wifi is enabled. Checking user auto-wifi permission", false)
-        if (isSetup && !isAndroidQorLater()) {
+        if (isSetup) {
             wifiHelper.startScan()
         }
     }
@@ -256,10 +256,6 @@ class MainActivity : AppCompatActivity(),
         logText("NetworkCallback onAvailable", false)
         if (ssid == convertToQuotedString(WIFI_SSID)) {
             proceed()
-        } else {
-            if (isSetup && isAndroidQorLater()) {
-                wifiHelper.startScan()
-            }
         }
     }
 

@@ -10,7 +10,6 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.net.wifi.*
 import android.os.Build
-import android.os.Handler
 import android.os.PatternMatcher
 import android.util.Log
 import androidx.annotation.RequiresApi
@@ -42,9 +41,7 @@ class HotelWifiHelper(
     private val wifiScanReceiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent) {
             if (intent.action == WifiManager.SCAN_RESULTS_AVAILABLE_ACTION) {
-                Handler().postDelayed({
-                    activityCallback.onScanResult(wifiManager.scanResults)
-                }, 2000)
+                activityCallback.onScanResult(wifiManager.scanResults)
             }
         }
     }
@@ -159,6 +156,7 @@ class HotelWifiHelper(
                 IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
             )
         } else {
+            Log.e("TAG", "not scanning")
             activityCallback.onScanResult(arrayListOf())
         }
     }
