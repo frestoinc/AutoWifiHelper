@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.LocationManager
-import com.gtriip.autowifi.domain.isAndroidOreoOrLater
 
 class HotelLocationHelper(private val appContext: Context) :
     LocationHelper {
@@ -13,7 +12,10 @@ class HotelLocationHelper(private val appContext: Context) :
     private val packageName = appContext.packageName
 
     companion object {
-        val requiredLocationPermissions = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        val requiredLocationPermissions = arrayOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        )
     }
 
     override val providerChangedIntentAction: String
@@ -29,15 +31,12 @@ class HotelLocationHelper(private val appContext: Context) :
     }
 
     override fun locationPermissionsGranted(): Boolean {
-        if (isAndroidOreoOrLater()) {
-            return requiredLocationPermissions.all { permission ->
-                packageManager.checkPermission(
-                    permission,
-                    packageName
-                ) == PackageManager.PERMISSION_GRANTED
-            }
+        return requiredLocationPermissions.all { permission ->
+            packageManager.checkPermission(
+                permission,
+                packageName
+            ) == PackageManager.PERMISSION_GRANTED
         }
-        return true
     }
 
 }

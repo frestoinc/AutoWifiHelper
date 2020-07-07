@@ -10,10 +10,13 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.net.wifi.*
 import android.os.Build
+import android.os.Handler
 import android.os.PatternMatcher
 import android.util.Log
 import androidx.annotation.RequiresApi
 import com.gtriip.autowifi.domain.convertToQuotedString
+import com.gtriip.autowifi.domain.isAndroidMarshmallowOrLater
+import com.gtriip.autowifi.domain.isAndroidNougatOrLater
 import com.gtriip.autowifi.domain.isAndroidQorLater
 import com.gtriip.autowifi.ui.ActivityCallback
 import java.util.*
@@ -25,7 +28,9 @@ class HotelWifiHelper(
     WifiHelper {
 
     companion object {
-        const val preferenceName = "allowConnectHotelWifi"
+        const val preferenceName = "wificonfiguration"
+        const val isAutoWifi = "isAutoWifi"
+        const val isConfigured = "isConfigured"
     }
 
     private val wifiManager =
@@ -41,7 +46,9 @@ class HotelWifiHelper(
     private val wifiScanReceiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent) {
             if (intent.action == WifiManager.SCAN_RESULTS_AVAILABLE_ACTION) {
-                activityCallback.onScanResult(wifiManager.scanResults)
+                Handler().postDelayed({
+                    activityCallback.onScanResult(wifiManager.scanResults)
+                }, 2000)
             }
         }
     }
@@ -55,7 +62,10 @@ class HotelWifiHelper(
                         WifiManager.EXTRA_WIFI_STATE,
                         WifiManager.WIFI_STATE_UNKNOWN
                     )) {
-                        WifiManager.WIFI_STATE_ENABLED -> activityCallback.onWifiStateEnabled()
+                        WifiManager.WIFI_STATE_ENABLED -> {
+                            Log.e("wifiStateReceiver", "SSID: ${wifiManager.connectionInfo.ssid}")
+                            activityCallback.onWifiStateEnabled()
+                        }
                         WifiManager.WIFI_STATE_DISABLED -> activityCallback.onWifiStateDisabled()
                     }
                 }
@@ -67,8 +77,10 @@ class HotelWifiHelper(
         object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 super.onAvailable(network)
-                connectivityManager.bindProcessToNetwork(network)
-                activityCallback.onAvailable(wifiManager.connectionInfo.ssid)
+                if (isAndroidMarshmallowOrLater()) {
+                    connectivityManager.bindProcessToNetwork(network)
+                }
+                activityCallback.onAvailable()
             }
 
             override fun onUnavailable() {
@@ -87,11 +99,19 @@ class HotelWifiHelper(
     }
 
     override fun isAutoWifiPermissionGranted(): Boolean {
-        return sharedPreferences.getBoolean(preferenceName, false)
+        return sharedPreferences.getBoolean(isAutoWifi, false)
     }
 
     override fun setAutoWifiPermission(granted: Boolean) {
-        sharedPreferences.edit().putBoolean(preferenceName, granted).apply()
+        sharedPreferences.edit().putBoolean(isAutoWifi, granted).apply()
+    }
+
+    override fun isConfigured(): Boolean {
+        return sharedPreferences.getBoolean(isConfigured, false)
+    }
+
+    override fun setConfigured(set: Boolean) {
+        sharedPreferences.edit().putBoolean(isConfigured, set).apply()
     }
 
     override fun registerNetworkReceiver() {
@@ -109,39 +129,43 @@ class HotelWifiHelper(
     }
 
     @RequiresApi(Build.VERSION_CODES.Q)
-    override fun getSpecificWifi(ssid: String, pwd: String): WifiNetworkSpecifier {
-        return WifiNetworkSpecifier.Builder()
+    override fun getSpecificWifi(ssid: String, pwd: String?): WifiNetworkSpecifier {
+        val builder = WifiNetworkSpecifier.Builder()
             .setSsidPattern(PatternMatcher(ssid, PatternMatcher.PATTERN_PREFIX))
-            .setWpa2Passphrase(pwd)
-            .build()
+        if (pwd != null) {
+            builder.setWpa2Passphrase(pwd)
+        }
+        return builder.build()
     }
 
     @RequiresApi(Build.VERSION_CODES.Q)
-    override fun buildNetworkRequest(ssid: String, pwd: String): NetworkRequest {
-        return NetworkRequest.Builder()
-            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-            .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-            .setNetworkSpecifier(getSpecificWifi(ssid, pwd))
-            .build()
-    }
-
-    @RequiresApi(Build.VERSION_CODES.Q)
-    override fun getWifiSuggestion(ssid: String, pwd: String): WifiNetworkSuggestion {
-        return WifiNetworkSuggestion.Builder()
+    override fun getWifiSuggestion(ssid: String, pwd: String?): WifiNetworkSuggestion {
+        val builder = WifiNetworkSuggestion.Builder()
             .setSsid(ssid)
-            .setWpa2Passphrase(pwd)
-            .build()
+        if (pwd != null) {
+            builder.setWpa2Passphrase(pwd)
+        }
+        return builder.build()
     }
 
     @RequiresApi(Build.VERSION_CODES.Q)
     override fun getWifiSuggestionList(
         ssid: String,
-        pwd: String
+        pwd: String?
     ): ArrayList<WifiNetworkSuggestion> {
         val list =
             ArrayList<WifiNetworkSuggestion>()
         list.add(getWifiSuggestion(ssid, pwd))
         return list
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    override fun buildNetworkRequest(ssid: String, pwd: String?): NetworkRequest {
+        return NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .setNetworkSpecifier(getSpecificWifi(ssid, pwd))
+            .build()
     }
 
     override fun turnOnWifi() {
@@ -165,22 +189,26 @@ class HotelWifiHelper(
         appContext.unregisterReceiver(wifiScanReceiver)
     }
 
-    override fun buildAutoWifiConnection(result: ScanResult, pwd: String) {
+    override fun doesSSIDMatch(ssid: String): Boolean {
+        return wifiManager.connectionInfo.ssid == convertToQuotedString(ssid)
+    }
+
+    override fun buildAutoWifiConnection(result: ScanResult, pwd: String?) {
         stopScan()
         Log.e("TAG", "START AutoWifiConnection")
         if (isAndroidQorLater()) {
-            autoWifiConnectQ(result, pwd)
+            autoWifiConnectQOrLater(result.SSID, pwd)
         } else {
             autoWifiConnectPreQ(result, pwd)
         }
     }
 
     @RequiresApi(api = Build.VERSION_CODES.Q)
-    private fun autoWifiConnectQ(result: ScanResult, pwd: String) {
-        connectivityManager.requestNetwork(buildNetworkRequest(result.SSID, pwd), networkCallback)
+    internal fun autoWifiConnectQOrLater(ssid: String, pwd: String?) {
+        connectivityManager.requestNetwork(buildNetworkRequest(ssid, pwd), networkCallback)
     }
 
-    private fun autoWifiConnectPreQ(result: ScanResult, pwd: String) {
+    private fun autoWifiConnectPreQ(result: ScanResult, pwd: String?) {
         var configuration: WifiConfiguration? = null
         for (configured in wifiManager.configuredNetworks) {
             if (result.SSID == configured.SSID) {
@@ -201,9 +229,15 @@ class HotelWifiHelper(
         wifiManager.disconnect()
         wifiManager.enableNetwork(i, true)
         wifiManager.reconnect()
+        if (isAndroidNougatOrLater()) {
+            connectivityManager.registerDefaultNetworkCallback(networkCallback)
+        } else {
+            setConfigured(true)
+            activityCallback.onWifiStateEnabled()
+        }
     }
 
-    private fun getConfiguration(result: ScanResult, password: String): WifiConfiguration {
+    private fun getConfiguration(result: ScanResult, password: String?): WifiConfiguration {
         val capabilities = result.capabilities.substring(1, result.capabilities.indexOf(']') - 1)
             .split('-')
             .toSet()
@@ -234,13 +268,14 @@ class HotelWifiHelper(
             config.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.WPA_PSK)
         else if (auth.contains("WPA2") && keyManagement.contains("PSK"))
             config.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.WPA_PSK)
+        else config.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE)
 
         if (pairwiseCipher.contains("CCMP") || pairwiseCipher.contains("TKIP")) {
             config.allowedPairwiseCiphers.set(WifiConfiguration.PairwiseCipher.CCMP)
             config.allowedPairwiseCiphers.set(WifiConfiguration.PairwiseCipher.TKIP)
         }
 
-        if (password.isNotEmpty()) {
+        if (password != null && password.isNotEmpty()) {
             if (auth.contains("WEP")) {
                 if (password.matches("\\p{XDigit}+".toRegex())) {
                     config.wepKeys[0] = password
@@ -251,6 +286,8 @@ class HotelWifiHelper(
             } else {
                 config.preSharedKey = convertToQuotedString(password)
             }
+        } else {
+            Log.e("getConfiguration", "password is null")
         }
 
         return config

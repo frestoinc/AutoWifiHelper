@@ -1,7 +1,7 @@
 package com.gtriip.autowifi.wifi
 
 interface WifiNetworkCallback {
-    fun onAvailable(ssid: String)
+    fun onAvailable()
 
     fun onUnavailable()
 

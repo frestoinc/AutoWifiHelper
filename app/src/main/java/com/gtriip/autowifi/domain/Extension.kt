@@ -16,13 +16,14 @@ fun isAndroidQorLater(): Boolean {
     return Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
 }
 
-fun isAndroidPieOrLater(): Boolean {
-    return Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+fun isAndroidNougatOrLater(): Boolean {
+    return Build.VERSION.SDK_INT >= Build.VERSION_CODES.N
 }
 
-fun isAndroidOreoOrLater(): Boolean {
-    return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+fun isAndroidMarshmallowOrLater(): Boolean {
+    return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
 }
+
 
 fun Activity.createDialog(type: DialogType, dialogListener: DialogListener): AlertDialog {
     return AlertDialog.Builder(this)

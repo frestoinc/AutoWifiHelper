@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.wifi.ScanResult
 import android.os.Bundle
+import android.os.Handler
 import android.provider.Settings
 import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
@@ -20,12 +21,13 @@ import com.gtriip.autowifi.domain.*
 import com.gtriip.autowifi.location.HotelLocationHelper
 import com.gtriip.autowifi.wifi.HotelWifiHelper
 
-//todo first we scan
-//todo if scan result is empty means ssid is not in range. terminate
-//todo then we compare the scan result with the configuration in wifimanger
-//todo if it matches then we use the existing configuration
-//todo else base on the scanresult we determine the configuration by parsing the result security type
-//todo then we connect
+/** first we scan
+if scan result is empty means ssid is not in range. terminate
+then we compare the scan result with the configuration in wifimanger
+if it matches then we use the existing configuration
+else base on the scanresult we determine the configuration by parsing the result security type
+then we connect**/
+
 class MainActivity : AppCompatActivity(),
     DialogListener,
     ActivityCallback {
@@ -41,8 +43,6 @@ class MainActivity : AppCompatActivity(),
     private lateinit var locationHelper: HotelLocationHelper
 
     private lateinit var wifiHelper: HotelWifiHelper
-
-    private var isSetup = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -117,33 +117,64 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun preCheckConditions() {
-        logText("Checking location Permission", false)
-        if (!locationHelper.locationPermissionsGranted()) {
-            requestLocationPermission()
+        logText("Checking whether user permits auto-wifi connection", false)
+        if (!wifiHelper.isAutoWifiPermissionGranted()) {
+            requestAutoWifiConnectPermission()
             return
         }
 
-        logText("START autoWifiConnect for SSID:$WIFI_SSID", false)
+        if (wifiHelper.isConfigured()) {
+            postConfiguration()
+        } else {
+            preConfiguration()
+        }
+
+    }
+
+    private fun postConfiguration() {
+        logText("START postConfiguration autoWifiConnect for SSID: $WIFI_SSID", false)
         if (!wifiHelper.isWifiEnabled()) {
             turnOnWifiSettings()
             return
         }
 
-        if (isAndroidPieOrLater()) {
-            logText("Android 9 or higher detected. Checking location settings", true)
-            if (!locationHelper.isLocationEnabled()) {
-                logText("Location is off", true)
-                showLocationOnRationale()
-                return
-            }
-        }
-        if (!wifiHelper.isAutoWifiPermissionGranted()) {
-            requestAutoWifiConnectPermission()
+        if (!locationHelper.isLocationEnabled()) {
+            logText("Location is off", true)
+            showLocationOnRationale()
             return
         }
-        isSetup = true
-        wifiHelper.registerNetworkReceiver()
+        resetNetworkReceiver()
+    }
 
+    private fun preConfiguration() {
+        logText("START preConfiguration autoWifiConnect for SSID: $WIFI_SSID", false)
+        if (!locationHelper.locationPermissionsGranted()) {
+            requestLocationPermission()
+            return
+        }
+
+        if (!locationHelper.isLocationEnabled()) {
+            logText("Location is off", true)
+            showLocationOnRationale()
+            return
+        }
+
+        if (!wifiHelper.isWifiEnabled()) {
+            turnOnWifiSettings()
+            return
+        }
+
+        resetNetworkReceiver()
+    }
+
+    private fun resetNetworkReceiver() {
+        try {
+            wifiHelper.unRegisterNetwork()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            wifiHelper.registerNetworkReceiver()
+        }
     }
 
     private fun turnOnLocationSettings() {
@@ -156,6 +187,7 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun turnOnWifiSettings() {
+        wifiHelper.registerNetworkReceiver()
         if (isAndroidQorLater()) {
             val panelIntent = Intent(Settings.Panel.ACTION_WIFI)
             startActivityForResult(
@@ -164,16 +196,122 @@ class MainActivity : AppCompatActivity(),
             )
         } else {
             wifiHelper.turnOnWifi()
-            preCheckConditions()
         }
     }
 
     private fun requestLocationPermission() {
         requestPermissions(
-            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ),
             REQUEST_CODE_FOR_LOCATION_PERMISSION
         )
         return
+    }
+
+    override fun onWifiStateEnabled() {
+        logText("onWifiStateEnabled", false)
+        if (!wifiHelper.isConfigured()) {
+            wifiHelper.startScan()
+        } else {
+            Handler().postDelayed({
+                when {
+                    wifiHelper.doesSSIDMatch(WIFI_SSID) -> {
+                        proceed()
+                    }
+                    isAndroidQorLater() -> {
+                        wifiHelper.autoWifiConnectQOrLater(WIFI_SSID, WIFI_PWD)
+                    }
+                    else -> {
+                        wifiHelper.setConfigured(false)
+                        preConfiguration()
+                    }
+                }
+            }, 3000)
+        }
+    }
+
+    override fun onWifiStateDisabled() {
+        logText("wifi is disabled", true)
+    }
+
+    override fun onAvailable() {
+        logText("NetworkCallback onAvailable", false)
+        if (wifiHelper.doesSSIDMatch(WIFI_SSID)) {
+            proceed()
+        } else {
+            logText("ssid does not match", true)
+        }
+    }
+
+    override fun onUnavailable() {
+        logText("NetworkCallback onUnavailable", true)
+    }
+
+    override fun onLost() {
+        logText("NetworkCallback onLost", true)
+    }
+
+    override fun onScanResult(result: List<ScanResult>) {
+        if (result.isEmpty()) {
+            Toast.makeText(this, "Wi-Fi not in range", Toast.LENGTH_LONG).show()
+        } else {
+            for (sr in result) {
+                logText("scanresult ssid: ${sr.SSID}", false)
+                if (sr.SSID == WIFI_SSID) {
+                    wifiHelper.stopScan()
+                    wifiHelper.buildAutoWifiConnection(sr, WIFI_PWD)
+                    break
+                }
+            }
+        }
+    }
+
+    override fun onPositiveButtonClicked(type: DialogType) {
+        when (type) {
+            DialogType.LOCATION_PERMISSION_RATIONALE -> requestLocationPermission()
+            DialogType.AUTO_WIFI_PERMISSION -> {
+                wifiHelper.setAutoWifiPermission(true)
+                preCheckConditions()
+            }
+            DialogType.AUTO_WIFI_RATIONALE -> requestAutoWifiConnectPermission()
+            DialogType.WIFI_DISABLED -> preCheckConditions()
+            DialogType.LOCATION_WIFI_RATIONALE -> turnOnLocationSettings()
+        }
+    }
+
+    override fun onNegativeButtonClicked(type: DialogType) {
+        when (type) {
+            DialogType.AUTO_WIFI_PERMISSION -> {
+                wifiHelper.setAutoWifiPermission(false)
+                showAutoWifiConnectionRationale()
+            }
+            else -> taskCancelled()
+        }
+    }
+
+    override fun onCancelled(type: DialogType) {
+        when (type) {
+            DialogType.AUTO_WIFI_PERMISSION -> {
+                wifiHelper.setAutoWifiPermission(false)
+                showAutoWifiConnectionRationale()
+            }
+            else -> taskCancelled()
+        }
+    }
+
+    private fun taskCancelled() {
+        logText("TASK ABORTED!", true)
+    }
+
+    private fun proceed() {
+        wifiHelper.setConfigured(true)
+        this.onSuccess()
+    }
+
+    private fun onSuccess() {
+        logText("ALL OK", false)
     }
 
     private fun showLocationPermissionDialog() {
@@ -194,90 +332,5 @@ class MainActivity : AppCompatActivity(),
 
     private fun showAutoWifiConnectionRationale() {
         createDialog(DialogType.AUTO_WIFI_RATIONALE, this).show()
-    }
-
-    private fun showTerminateToast() {
-        Toast.makeText(this, "Auto-wifi Denied. Terminate task.", Toast.LENGTH_LONG).show()
-    }
-
-    private fun proceed() {
-        logText("EVERYTHING IS OK!!!!!!!!", false)
-        Toast.makeText(this, "ALL OK!!!!!!", Toast.LENGTH_LONG).show()
-    }
-
-    override fun onPositiveButtonClicked(type: DialogType) {
-        when (type) {
-            DialogType.LOCATION_PERMISSION_RATIONALE -> requestLocationPermission()
-            DialogType.AUTO_WIFI_PERMISSION -> {
-                wifiHelper.setAutoWifiPermission(true)
-                preCheckConditions()
-            }
-            DialogType.AUTO_WIFI_RATIONALE -> requestAutoWifiConnectPermission()
-            DialogType.WIFI_DISABLED -> preCheckConditions()
-            DialogType.LOCATION_WIFI_RATIONALE -> turnOnLocationSettings()
-        }
-    }
-
-    override fun onNegativeButtonClicked(type: DialogType) {
-        when (type) {
-            DialogType.LOCATION_PERMISSION_RATIONALE -> showTerminateToast()
-            DialogType.AUTO_WIFI_PERMISSION -> {
-                wifiHelper.setAutoWifiPermission(false)
-                showAutoWifiConnectionRationale()
-            }
-            else -> showTerminateToast()
-        }
-    }
-
-    override fun onCancelled(type: DialogType) {
-        when (type) {
-            DialogType.LOCATION_PERMISSION_RATIONALE -> showTerminateToast()
-            DialogType.AUTO_WIFI_PERMISSION -> {
-                wifiHelper.setAutoWifiPermission(false)
-                showAutoWifiConnectionRationale()
-            }
-            else -> showTerminateToast()
-        }
-    }
-
-    override fun onWifiStateEnabled() {
-        logText("wifi is enabled. Checking user auto-wifi permission", false)
-        if (isSetup) {
-            wifiHelper.startScan()
-        }
-    }
-
-    override fun onWifiStateDisabled() {
-        logText("wifi is disabled", true)
-        preCheckConditions()
-    }
-
-    override fun onAvailable(ssid: String) {
-        logText("NetworkCallback onAvailable", false)
-        if (ssid == convertToQuotedString(WIFI_SSID)) {
-            proceed()
-        }
-    }
-
-    override fun onUnavailable() {
-        logText("NetworkCallback onUnavailable", true)
-    }
-
-    override fun onLost() {
-        logText("NetworkCallback onLost", true)
-    }
-
-    override fun onScanResult(result: List<ScanResult>) {
-        if (result.isEmpty()) {
-            Log.e("TAG", "Wifi not in range")
-        } else {
-            for (sr in result) {
-                Log.e("TAG", sr.SSID)
-                if (sr.SSID == WIFI_SSID) {
-                    wifiHelper.buildAutoWifiConnection(sr, WIFI_PWD)
-                    break
-                }
-            }
-        }
     }
 }

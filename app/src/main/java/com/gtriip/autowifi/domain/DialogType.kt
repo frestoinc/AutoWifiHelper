@@ -10,7 +10,9 @@ enum class DialogType {
     },
     LOCATION_WIFI_RATIONALE {
         override fun title() = "Turn on Location"
-        override fun message() = "This App need to turn on location to read Wi-Fi SSID"
+        override fun message() =
+            "This App need to turn on location to read Wi-Fi SSID (GPS / High Accuracy Option)"
+
         override fun pBtn() =
             turnOn
 
@@ -33,7 +35,6 @@ enum class DialogType {
         override fun message() = "This App needs to connect to the Hotel Wi-fi Hotspot"
         override fun pBtn() =
             turnOn
-
         override fun nBtn() = "Cancel"
     };
 

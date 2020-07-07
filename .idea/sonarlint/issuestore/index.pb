@@ -21,3 +21,5 @@ m
 =app/src/main/java/com/gtriip/autowifi/wifi/HotelWifiHelper.kt,8\e\8ef1a3b9b9db186163207ff30c0898fcede4762f
 h
 8app/src/main/java/com/gtriip/autowifi/ui/MainActivity.kt,2\2\2280b363b8869077a85fd780cb63bd03d5b8a93d
+<
+build.gradle,f\0\f07866736216be0ee2aba49e392191aeae700a35
