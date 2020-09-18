@@ -11,27 +11,19 @@ interface WifiHelper {
 
     fun isWifiEnabled(): Boolean
 
-    fun isAutoWifiPermissionGranted(): Boolean
-
-    fun setAutoWifiPermission(granted: Boolean)
-
-    fun isConfigured(): Boolean
-
-    fun setConfigured(set: Boolean)
-
     fun registerNetworkReceiver()
 
-    fun unRegisterNetwork()
+    fun unregisterNetworkReceiver()
 
-    fun getSpecificWifi(ssid: String, pwd: String?): WifiNetworkSpecifier
+    fun getSpecificWifi(ssid: String, pwd: String): WifiNetworkSpecifier
 
-    fun getWifiSuggestion(ssid: String, pwd: String?): WifiNetworkSuggestion
+    fun getWifiSuggestion(ssid: String, pwd: String): WifiNetworkSuggestion
 
-    fun getWifiSuggestionList(ssid: String, pwd: String?): ArrayList<WifiNetworkSuggestion>
+    fun getWifiSuggestionList(ssid: String, pwd: String): ArrayList<WifiNetworkSuggestion>
 
-    fun buildNetworkRequest(ssid: String, pwd: String?): NetworkRequest
+    fun buildNetworkRequest(result: ScanResult, pwd: String): NetworkRequest
 
-    fun buildAutoWifiConnection(result: ScanResult, pwd: String?)
+    fun buildAutoWifiConnection(result: ScanResult, pwd: String)
 
     fun startScan()
 

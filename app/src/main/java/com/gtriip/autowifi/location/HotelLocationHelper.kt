@@ -25,6 +25,7 @@ class HotelLocationHelper(private val appContext: Context) :
         get() = Companion.requiredLocationPermissions
 
     override fun isLocationEnabled(): Boolean {
+        if (!locationPermissionsGranted()) return false
         val locationManager =
             appContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)

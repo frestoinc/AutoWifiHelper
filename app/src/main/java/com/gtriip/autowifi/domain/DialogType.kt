@@ -15,7 +15,6 @@ enum class DialogType {
 
         override fun pBtn() =
             turnOn
-
         override fun nBtn() = "Dismiss"
     },
     AUTO_WIFI_PERMISSION {
@@ -47,5 +46,4 @@ enum class DialogType {
     abstract fun pBtn(): String
     abstract fun nBtn(): String
 }
-
 
